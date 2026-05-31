@@ -4,7 +4,7 @@
   "description": "A set of tools for spec-driven development.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.120.0"
+    "vscode": "^1.105.0"
   },
   "categories": [
     "Other"
@@ -14,10 +14,19 @@
   "contributes": {
     "commands": [
       {
-        "command": "spectacles.helloWorld",
-        "title": "Hello World"
+        "command": "my-plugin.runShellScript",
+        "title": "Run Custom Shell Script",
+        "category": "Automation"
       }
-    ]
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "my-plugin.runShellScript",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -34,7 +43,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.120.0",
+    "@types/vscode": "^1.105.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "typescript-eslint": "^8.56.1",
