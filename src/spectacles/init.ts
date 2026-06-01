@@ -9,6 +9,7 @@ import {
 } from './layout';
 
 const SCRIPT_TEMPLATES = ['code-to-spec.sh', 'spec-to-code.sh'] as const;
+const PROMPT_TEMPLATES = ['code-to-spec.md', 'spec-to-code.md'] as const;
 
 export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 	const root = getWorkspaceRootUri();
@@ -40,8 +41,20 @@ export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 		await vscode.workspace.fs.writeFile(destUri, content);
 	}
 
+	for (const promptName of PROMPT_TEMPLATES) {
+		const templatePath = path.join(
+			context.extensionPath,
+			'resources',
+			'prompts',
+			promptName
+		);
+		const content = await fs.readFile(templatePath);
+		const destUri = resolveLayoutUri(root, `.spectacles/prompts/${promptName}`);
+		await vscode.workspace.fs.writeFile(destUri, content);
+	}
+
 	if (alreadyInitialized) {
-		vscode.window.showInformationMessage('Spectacles scripts updated.');
+		vscode.window.showInformationMessage('Spectacles project files updated.');
 	} else {
 		vscode.window.showInformationMessage(
 			'Spectacles initialized. On Unix, run chmod +x on scripts in .spectacles/scripts/ if needed.'
