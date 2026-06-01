@@ -9,5 +9,4 @@ if [[ $# -lt 1 ]]; then
 fi
 
 SOURCE_PATH="$1"
-echo "code-to-spec: not implemented (source: ${SOURCE_PATH})" >&2
-exit 1
+echo "code-to-spec: ${SOURCE_PATH}"

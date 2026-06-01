@@ -18,16 +18,13 @@ export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 	}
 
 	const spectaclesDir = resolveLayoutUri(root, '.spectacles');
-	if (await pathExists(spectaclesDir)) {
-		vscode.window.showWarningMessage(
-			'Spectacles is already initialized (.spectacles exists).'
-		);
-		return;
-	}
+	const alreadyInitialized = await pathExists(spectaclesDir);
 
-	for (const entry of SPECTACLES_LAYOUT) {
-		if (entry.type === 'directory') {
-			await vscode.workspace.fs.createDirectory(resolveLayoutUri(root, entry.relativePath));
+	if (!alreadyInitialized) {
+		for (const entry of SPECTACLES_LAYOUT) {
+			if (entry.type === 'directory') {
+				await vscode.workspace.fs.createDirectory(resolveLayoutUri(root, entry.relativePath));
+			}
 		}
 	}
 
@@ -43,7 +40,11 @@ export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 		await vscode.workspace.fs.writeFile(destUri, content);
 	}
 
-	vscode.window.showInformationMessage(
-		'Spectacles initialized. On Unix, run chmod +x on scripts in .spectacles/scripts/ if needed.'
-	);
+	if (alreadyInitialized) {
+		vscode.window.showInformationMessage('Spectacles scripts updated.');
+	} else {
+		vscode.window.showInformationMessage(
+			'Spectacles initialized. On Unix, run chmod +x on scripts in .spectacles/scripts/ if needed.'
+		);
+	}
 }

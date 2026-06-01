@@ -3,6 +3,7 @@
   "displayName": "spectacles",
   "description": "A set of tools for spec-driven development.",
   "version": "0.0.1",
+  "publisher": "Matthew Holliday",
   "engines": {
     "vscode": "^1.105.0"
   },
@@ -23,16 +24,25 @@
         "category": "Spectacles"
       },
       {
-        "command": "my-plugin.runShellScript",
-        "title": "Run Custom Shell Script",
-        "category": "Automation"
+        "command": "spectacles.codeToSpec",
+        "title": "Code-to-Spec",
+        "category": "Spectacles"
+      },
+      {
+        "command": "spectacles.specToCode",
+        "title": "Spec-to-Code",
+        "category": "Spectacles"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "command": "my-plugin.runShellScript",
-          "group": "navigation"
+          "command": "spectacles.codeToSpec",
+          "group": "navigation@1"
+        },
+        {
+          "command": "spectacles.specToCode",
+          "group": "navigation@2"
         }
       ]
     }

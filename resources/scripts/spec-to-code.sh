@@ -9,5 +9,4 @@ if [[ $# -lt 1 ]]; then
 fi
 
 SPEC_PATH="$1"
-echo "spec-to-code: not implemented (spec: ${SPEC_PATH})" >&2
-exit 1
+echo "spec-to-code: ${SPEC_PATH}"
