@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { runInit } from './spectacles/init';
-import { runWorkspaceScript } from './spectacles/runScript';
+import { runAgentPrompt } from './spectacles/runPrompt';
 import { runValidate } from './spectacles/validate';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -8,10 +8,10 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('spectacles.init', () => runInit(context)),
 		vscode.commands.registerCommand('spectacles.validateProject', () => runValidate()),
 		vscode.commands.registerCommand('spectacles.codeToSpec', (uri: vscode.Uri) =>
-			runWorkspaceScript('code-to-spec.sh', uri)
+			runAgentPrompt('code-to-spec', uri)
 		),
 		vscode.commands.registerCommand('spectacles.specToCode', (uri: vscode.Uri) =>
-			runWorkspaceScript('spec-to-code.sh', uri)
+			runAgentPrompt('spec-to-code', uri)
 		),
 	);
 }

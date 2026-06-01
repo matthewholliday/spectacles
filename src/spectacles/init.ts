@@ -10,6 +10,7 @@ import {
 
 const SCRIPT_TEMPLATES = ['code-to-spec.sh', 'spec-to-code.sh'] as const;
 const PROMPT_TEMPLATES = ['code-to-spec.md', 'spec-to-code.md'] as const;
+const FRAGMENT_TEMPLATES = ['plan.md'] as const;
 
 export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 	const root = getWorkspaceRootUri();
@@ -21,11 +22,9 @@ export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 	const spectaclesDir = resolveLayoutUri(root, '.spectacles');
 	const alreadyInitialized = await pathExists(spectaclesDir);
 
-	if (!alreadyInitialized) {
-		for (const entry of SPECTACLES_LAYOUT) {
-			if (entry.type === 'directory') {
-				await vscode.workspace.fs.createDirectory(resolveLayoutUri(root, entry.relativePath));
-			}
+	for (const entry of SPECTACLES_LAYOUT) {
+		if (entry.type === 'directory') {
+			await vscode.workspace.fs.createDirectory(resolveLayoutUri(root, entry.relativePath));
 		}
 	}
 
@@ -50,6 +49,19 @@ export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 		);
 		const content = await fs.readFile(templatePath);
 		const destUri = resolveLayoutUri(root, `.spectacles/prompts/${promptName}`);
+		await vscode.workspace.fs.writeFile(destUri, content);
+	}
+
+	for (const fragmentName of FRAGMENT_TEMPLATES) {
+		const templatePath = path.join(
+			context.extensionPath,
+			'resources',
+			'prompts',
+			'fragments',
+			fragmentName
+		);
+		const content = await fs.readFile(templatePath);
+		const destUri = resolveLayoutUri(root, `.spectacles/prompts/fragments/${fragmentName}`);
 		await vscode.workspace.fs.writeFile(destUri, content);
 	}
 
