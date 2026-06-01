@@ -9,10 +9,19 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
+      {
+        "command": "spectacles.init",
+        "title": "Spectacles: Init",
+        "category": "Spectacles"
+      },
+      {
+        "command": "spectacles.validateProject",
+        "title": "Spectacles: Validate Project",
+        "category": "Spectacles"
+      },
       {
         "command": "my-plugin.runShellScript",
         "title": "Run Custom Shell Script",
