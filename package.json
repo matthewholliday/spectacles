@@ -14,12 +14,12 @@
     "commands": [
       {
         "command": "spectacles.init",
-        "title": "Spectacles: Init",
+        "title": "Init",
         "category": "Spectacles"
       },
       {
         "command": "spectacles.validateProject",
-        "title": "Spectacles: Validate Project",
+        "title": "Validate Project",
         "category": "Spectacles"
       },
       {
