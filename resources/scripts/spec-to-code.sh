@@ -9,4 +9,7 @@ if [[ $# -lt 1 ]]; then
 fi
 
 SPEC_PATH="$1"
-echo "spec-to-code: ${SPEC_PATH}"
+PROMPT_FILE="$(dirname "$0")/../prompts/spec-to-code.md"
+
+cat "${PROMPT_FILE}"
+echo "${SPEC_PATH}"
