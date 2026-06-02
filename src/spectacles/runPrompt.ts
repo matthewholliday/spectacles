@@ -1,4 +1,4 @@
-import { Agent, CursorAgentError } from '@cursor/sdk';
+import { spawn } from 'child_process';
 import * as vscode from 'vscode';
 import {
 	getWorkspaceRootUri,
@@ -37,14 +37,6 @@ export async function runAgentPrompt(
 		return;
 	}
 
-	const apiKey = process.env.CURSOR_API_KEY;
-	if (!apiKey) {
-		vscode.window.showErrorMessage(
-			'CURSOR_API_KEY is not set. Export it in your shell environment before launching VS Code.'
-		);
-		return;
-	}
-
 	const planUri = resolveLayoutUri(root, '.spectacles/prompts/fragments/plan.md');
 	const promptUri = resolveLayoutUri(root, `.spectacles/prompts/${promptName}.md`);
 
@@ -71,45 +63,40 @@ export async function runAgentPrompt(
 	output.appendLine('');
 	output.show(true);
 
-	await vscode.window.withProgress(
-		{
-			location: vscode.ProgressLocation.Notification,
-			title: `Spectacles: running ${promptName}...`,
-			cancellable: false,
-		},
-		async () => {
-			try {
-				const result = await Agent.prompt(fullPrompt, {
-					apiKey,
-					local: { cwd: root.fsPath },
-				});
+	const child = spawn('cursor', ['agent', '--print', fullPrompt], {
+		cwd: root.fsPath,
+		shell: false,
+	});
 
-				if (result.result) {
-					output.appendLine(result.result);
-					output.appendLine('');
-				}
+	child.stdout.on('data', (data: Buffer) => {
+		output.append(data.toString());
+	});
 
-				if (result.status === 'error') {
-					output.appendLine(`[spectacles] run failed (id: ${result.id})`);
-					vscode.window.showErrorMessage(
-						`${promptName} failed. See Output → ${OUTPUT_CHANNEL_NAME}.`
-					);
-				} else {
-					output.appendLine(`[spectacles] done (status: ${result.status}, id: ${result.id})`);
-					vscode.window.showInformationMessage(
-						`${promptName} finished. See Output → ${OUTPUT_CHANNEL_NAME}.`
-					);
-				}
-			} catch (err: unknown) {
-				if (err instanceof CursorAgentError) {
-					output.appendLine(`[spectacles] startup failed: ${err.message}`);
-					vscode.window.showErrorMessage(`${promptName} startup error: ${err.message}`);
-				} else {
-					const message = err instanceof Error ? err.message : String(err);
-					output.appendLine(`[spectacles] error: ${message}`);
-					vscode.window.showErrorMessage(`${promptName} error: ${message}`);
-				}
+	child.stderr.on('data', (data: Buffer) => {
+		output.append(data.toString());
+	});
+
+	await new Promise<void>((resolve) => {
+		child.on('close', (code) => {
+			output.appendLine('');
+			if (code !== 0) {
+				output.appendLine(`[spectacles] exited with code ${code}`);
+				vscode.window.showErrorMessage(
+					`${promptName} failed (exit ${code}). See Output → ${OUTPUT_CHANNEL_NAME}.`
+				);
+			} else {
+				output.appendLine('[spectacles] done');
+				vscode.window.showInformationMessage(
+					`${promptName} finished. See Output → ${OUTPUT_CHANNEL_NAME}.`
+				);
 			}
-		}
-	);
+			resolve();
+		});
+
+		child.on('error', (err) => {
+			output.appendLine(`[spectacles] error: ${err.message}`);
+			vscode.window.showErrorMessage(`${promptName} error: ${err.message}`);
+			resolve();
+		});
+	});
 }
