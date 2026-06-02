@@ -32,6 +32,11 @@
         "command": "spectacles.specToCode",
         "title": "spectacles: spec-to-code",
         "category": "Spectacles"
+      },
+      {
+        "command": "spectacles.newSpec",
+        "title": "New Spec",
+        "category": "Spectacles"
       }
     ],
     "menus": {
