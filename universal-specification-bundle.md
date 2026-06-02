@@ -82,6 +82,7 @@ An actionable, machine-readable backlog optimized for LLMs or automated software
   "title": "USB_Tasks",
   "type": "object",
   "properties": {
+    "status": { "enum": ["draft", "in_progress", "review", "approved", "deprecated"] },
     "tasks": {
       "type": "array",
       "items": {
@@ -107,6 +108,6 @@ An actionable, machine-readable backlog optimized for LLMs or automated software
       }
     }
   },
-  "required": ["tasks"]
+  "required": ["status", "tasks"]
 }
 3. Workflow & Verification MatrixBecause developers can start anywhere, use this quick matrix to guide the development state:Starting StrategyInitial ActionNext Logical StepComplete State GoalProduct-FirstWrite requirements.mdHand off to Architect to build out design.md.tasks.json automatically derived from design elements.Architecture-FirstMap systems in design.mdExtract business objectives into requirements.md.Derive execution path into tasks.json.AI-First (Prototyping)Generate detailed tasks.jsonAgent fills out design.md based on implementation details.Reverse-engineer requirements.md for historical clarity.
