@@ -3,6 +3,7 @@ import { runInit } from './spectacles/init';
 import { runNewSpec } from './spectacles/newSpec';
 import { runAgentPrompt } from './spectacles/runPrompt';
 import { runValidate } from './spectacles/validate';
+import { runViewBundleStatus } from './spectacles/viewBundle';
 
 export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
@@ -14,6 +15,9 @@ export function activate(context: vscode.ExtensionContext) {
 		),
 		vscode.commands.registerCommand('spectacles.specToCode', (uri: vscode.Uri) =>
 			runAgentPrompt('spec-to-code', uri)
+		),
+		vscode.commands.registerCommand('spectacles.viewBundleStatus', (uri: vscode.Uri) =>
+			runViewBundleStatus(uri, context)
 		),
 	);
 }

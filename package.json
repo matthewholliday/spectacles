@@ -37,6 +37,11 @@
         "command": "spectacles.newSpec",
         "title": "New Spec",
         "category": "Spectacles"
+      },
+      {
+        "command": "spectacles.viewBundleStatus",
+        "title": "View Bundle Status",
+        "category": "Spectacles"
       }
     ],
     "menus": {
@@ -48,6 +53,11 @@
         {
           "command": "spectacles.specToCode",
           "group": "spectacles@2"
+        },
+        {
+          "command": "spectacles.viewBundleStatus",
+          "when": "explorerResourceIsFolder",
+          "group": "spectacles@3"
         }
       ]
     }
