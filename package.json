@@ -12,7 +12,30 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "spectacles",
+          "title": "Spectacles",
+          "icon": "eyeglasses-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "spectacles": [
+        {
+          "type": "webview",
+          "id": "spectacles.homepage",
+          "name": "Spectacles"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "spectacles.openHomePage",
+        "title": "Open Homepage",
+        "category": "Spectacles"
+      },
       {
         "command": "spectacles.init",
         "title": "Init",
