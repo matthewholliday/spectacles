@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/spectacles-logger.sh"
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": ".cursor/hooks/spectacles-logger.sh"
+      }
+    ],
+    "afterAgentThought": [
+      {
+        "command": ".cursor/hooks/spectacles-logger.sh"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/spectacles-logger.sh"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/spectacles-logger.sh"
+      }
+    ]
+  }
+}

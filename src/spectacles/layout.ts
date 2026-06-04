@@ -16,6 +16,7 @@ export const SPECTACLES_LAYOUT: LayoutEntry[] = [
 	{ relativePath: '.spectacles/prompts', type: 'directory' },
 	{ relativePath: '.spectacles/prompts/code-to-spec.md', type: 'file' },
 	{ relativePath: '.spectacles/prompts/spec-to-code.md', type: 'file' },
+	{ relativePath: '.spectacles/logs', type: 'directory' },
 ];
 
 export function getWorkspaceRootUri(): vscode.Uri | undefined {

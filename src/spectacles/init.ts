@@ -10,7 +10,77 @@ import {
 
 const SCRIPT_TEMPLATES = ['code-to-spec.sh', 'spec-to-code.sh'] as const;
 const PROMPT_TEMPLATES = ['code-to-spec.md', 'spec-to-code.md'] as const;
-const AGENT_TEMPLATES = ['spectacles.draft-design.md'] as const;
+const AGENT_TEMPLATES = ['spectacles.draft-design.md', 'spectacles.generate-tasks.md'] as const;
+
+const SPECTACLES_HOOK_EVENTS = [
+	'sessionStart',
+	'afterAgentResponse',
+	'afterAgentThought',
+	'postToolUse',
+	'stop',
+] as const;
+
+const HOOK_COMMAND = '.cursor/hooks/spectacles-logger.sh';
+
+interface HooksJson {
+	version: number;
+	hooks: Record<string, Array<{ command: string }>>;
+}
+
+async function installHooks(context: vscode.ExtensionContext, root: vscode.Uri): Promise<void> {
+	const hooksDir = resolveLayoutUri(root, '.cursor/hooks');
+	await vscode.workspace.fs.createDirectory(hooksDir);
+
+	const scriptSrc = path.join(context.extensionPath, 'resources', 'hooks', 'spectacles-logger.sh');
+	const scriptContent = await fs.readFile(scriptSrc);
+	const scriptDest = resolveLayoutUri(root, '.cursor/hooks/spectacles-logger.sh');
+	await vscode.workspace.fs.writeFile(scriptDest, scriptContent);
+
+	// Make the hook script executable
+	try {
+		await fs.chmod(scriptDest.fsPath, 0o755);
+	} catch {
+		// Non-fatal: chmod may fail on Windows
+	}
+
+	// Merge our hooks into .cursor/hooks.json (preserve any existing hooks)
+	const hooksJsonUri = resolveLayoutUri(root, '.cursor/hooks.json');
+	let existing: HooksJson = { version: 1, hooks: {} };
+
+	const existingText = await (async () => {
+		try {
+			const bytes = await vscode.workspace.fs.readFile(hooksJsonUri);
+			return new TextDecoder().decode(bytes);
+		} catch {
+			return null;
+		}
+	})();
+
+	if (existingText) {
+		try {
+			existing = JSON.parse(existingText);
+		} catch {
+			// Malformed hooks.json — start fresh
+		}
+	}
+
+	if (!existing.hooks) {
+		existing.hooks = {};
+	}
+
+	for (const event of SPECTACLES_HOOK_EVENTS) {
+		const list = existing.hooks[event] ?? [];
+		const alreadyInstalled = list.some((h) => h.command === HOOK_COMMAND);
+		if (!alreadyInstalled) {
+			existing.hooks[event] = [...list, { command: HOOK_COMMAND }];
+		}
+	}
+
+	await vscode.workspace.fs.writeFile(
+		hooksJsonUri,
+		new TextEncoder().encode(JSON.stringify(existing, null, 2) + '\n')
+	);
+}
 
 export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 	const root = getWorkspaceRootUri();
@@ -66,6 +136,8 @@ export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 		const destUri = resolveLayoutUri(root, `.cursor/agents/${agentName}`);
 		await vscode.workspace.fs.writeFile(destUri, content);
 	}
+
+	await installHooks(context, root);
 
 	if (alreadyInitialized) {
 		vscode.window.showInformationMessage('Spectacles project files updated.');
