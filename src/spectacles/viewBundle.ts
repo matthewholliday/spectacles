@@ -14,7 +14,7 @@ interface BundleData {
 	metadata: BundleMetadata;
 }
 
-const openPanels = new Map<string, vscode.WebviewPanel>();
+const openPanels = new Map<string, { panel: vscode.WebviewPanel; uri: vscode.Uri }>();
 
 async function readFileText(uri: vscode.Uri): Promise<string | null> {
 	try {
@@ -46,40 +46,11 @@ async function readBundleData(dirUri: vscode.Uri): Promise<BundleData | null> {
 	return { metadata };
 }
 
-function statusColor(status: string | null): string {
-	switch (status) {
-		case 'complete':
-			return '#22c55e';
-		case 'ready_for_dev':
-			return '#3b82f6';
-		case 'design_complete':
-			return '#8b5cf6';
-		case 'requirements_complete':
-			return '#f59e0b';
-		case 'not_started':
-		default:
-			return '#6b7280';
-	}
-}
-
 const STATUS_ORDER = ['not_started', 'requirements_complete', 'design_complete', 'ready_for_dev', 'complete'] as const;
 
 function stepsCompleted(status: string): [boolean, boolean, boolean, boolean] {
 	const idx = STATUS_ORDER.indexOf(status as typeof STATUS_ORDER[number]);
 	return [idx >= 1, idx >= 2, idx >= 3, idx >= 4];
-}
-
-function statusLabel(status: string | null): string {
-	if (!status) {
-		return 'unknown';
-	}
-	return status.replace(/_/g, ' ');
-}
-
-function badge(status: string | null): string {
-	const color = statusColor(status);
-	const label = statusLabel(status);
-	return `<span class="badge" style="background:${color}">${label}</span>`;
 }
 
 function escapeHtml(str: string): string {
@@ -124,19 +95,24 @@ function buildHtml(data: BundleData): string {
   .spec-id { opacity: 0.5; font-size: 0.85em; font-family: var(--vscode-editor-font-family, monospace); }
   .meta-row { margin-top: 6px; opacity: 0.65; font-size: 0.85em; }
   .description { margin-top: 10px; opacity: 0.8; }
-  .badge {
-    display: inline-block;
-    padding: 2px 9px;
-    border-radius: 12px;
-    font-size: 0.78em;
-    font-weight: 600;
-    color: #fff;
-    text-transform: capitalize;
-    white-space: nowrap;
-    min-width: 120px;
-    text-align: center;
-  }
   .empty { opacity: 0.45; font-style: italic; }
+  .refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-button-border, transparent);
+    background: var(--vscode-button-secondaryBackground, rgba(128,128,128,0.15));
+    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    font-size: 0.85em;
+    font-family: var(--vscode-font-family, system-ui, sans-serif);
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .refresh-btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));
+  }
   .steps {
     display: flex;
     flex-direction: row;
@@ -192,7 +168,7 @@ function buildHtml(data: BundleData): string {
 <div class="header">
   <div class="header-row">
     <h1>Spectacles</h1>
-    ${badge(metadata.status)}
+    <button class="refresh-btn" onclick="refresh()">↻ Refresh</button>
   </div>
   <p class="subtitle">Spec Name: ${escapeHtml(metadata.name)}</p>
   ${metadata.description ? `<p class="description">${escapeHtml(metadata.description)}</p>` : ''}
@@ -220,6 +196,10 @@ function buildHtml(data: BundleData): string {
   </div>
 </div>
 
+<script>
+  const vscode = acquireVsCodeApi();
+  function refresh() { vscode.postMessage({ command: 'refresh' }); }
+</script>
 </body>
 </html>`;
 }
@@ -245,8 +225,8 @@ export async function runViewBundleStatus(
 
 	const existing = openPanels.get(panelId);
 	if (existing) {
-		existing.reveal();
-		existing.webview.html = buildHtml(data);
+		existing.panel.reveal();
+		existing.panel.webview.html = buildHtml(data);
 		return;
 	}
 
@@ -254,11 +234,20 @@ export async function runViewBundleStatus(
 		'spectacles.bundleStatus',
 		'Spectacles',
 		vscode.ViewColumn.Beside,
-		{ enableScripts: false, retainContextWhenHidden: true }
+		{ enableScripts: true, retainContextWhenHidden: true }
 	);
 
 	panel.webview.html = buildHtml(data);
 
-	openPanels.set(panelId, panel);
+	panel.webview.onDidReceiveMessage(async (message) => {
+		if (message.command === 'refresh') {
+			const refreshed = await readBundleData(uri);
+			if (refreshed) {
+				panel.webview.html = buildHtml(refreshed);
+			}
+		}
+	}, null, context.subscriptions);
+
+	openPanels.set(panelId, { panel, uri });
 	panel.onDidDispose(() => openPanels.delete(panelId), null, context.subscriptions);
 }
