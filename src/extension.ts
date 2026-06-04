@@ -5,10 +5,12 @@ import { runAgentPrompt } from './spectacles/runPrompt';
 import { runValidate } from './spectacles/validate';
 import { runViewBundleStatus } from './spectacles/viewBundle';
 import { RequirementsEditorProvider } from './spectacles/requirementsEditor';
+import { DesignEditorProvider } from './spectacles/designEditor';
 
 export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		RequirementsEditorProvider.register(context),
+		DesignEditorProvider.register(context),
 		vscode.commands.registerCommand('spectacles.init', () => runInit(context)),
 		vscode.commands.registerCommand('spectacles.validateProject', () => runValidate()),
 		vscode.commands.registerCommand('spectacles.newSpec', () => runNewSpec()),

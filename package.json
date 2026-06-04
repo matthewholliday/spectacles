@@ -54,6 +54,16 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "spectacles.designEditor",
+        "displayName": "Design Editor",
+        "selector": [
+          {
+            "filenamePattern": "**/design.md"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "menus": {
