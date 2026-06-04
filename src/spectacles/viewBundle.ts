@@ -10,20 +10,11 @@ interface BundleMetadata {
 	timestamps?: { created: string; updated: string };
 }
 
-interface Task {
-	id: string;
-	title: string;
-	status: string;
-	description?: string;
-	estimated_effort?: string;
-}
-
 interface BundleData {
 	metadata: BundleMetadata;
 	requirementsStatus: string | null;
 	designStatus: string | null;
 	tasksStatus: string | null;
-	tasks: Task[];
 }
 
 const openPanels = new Map<string, vscode.WebviewPanel>();
@@ -72,34 +63,25 @@ async function readBundleData(dirUri: vscode.Uri): Promise<BundleData | null> {
 	const designStatus = designText ? extractFrontMatterStatus(designText) : null;
 
 	let tasksStatus: string | null = null;
-	let tasks: Task[] = [];
 	if (tasksText) {
 		try {
 			const parsed = JSON.parse(tasksText);
 			tasksStatus = parsed.status ?? null;
-			tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
 		} catch {
 			// leave defaults
 		}
 	}
 
-	return { metadata, requirementsStatus, designStatus, tasksStatus, tasks };
+	return { metadata, requirementsStatus, designStatus, tasksStatus };
 }
 
 function statusColor(status: string | null): string {
 	switch (status) {
-		case 'approved':
 		case 'done':
 			return '#22c55e';
-		case 'in_progress':
-			return '#3b82f6';
-		case 'review':
+		case 'ready-for-review':
 			return '#f59e0b';
-		case 'blocked':
-		case 'deprecated':
-			return '#ef4444';
 		case 'draft':
-		case 'todo':
 		default:
 			return '#6b7280';
 	}
@@ -118,20 +100,6 @@ function badge(status: string | null): string {
 	return `<span class="badge" style="background:${color}">${label}</span>`;
 }
 
-function taskRow(task: Task): string {
-	const color = statusColor(task.status);
-	const effort = task.estimated_effort
-		? `<span class="effort">${task.estimated_effort}</span>`
-		: '';
-	return `
-		<div class="task-row">
-			<span class="task-id">${escapeHtml(task.id)}</span>
-			<span class="task-title">${escapeHtml(task.title)}</span>
-			${effort}
-			<span class="badge" style="background:${color}">${statusLabel(task.status)}</span>
-		</div>`;
-}
-
 function escapeHtml(str: string): string {
 	return str
 		.replace(/&/g, '&amp;')
@@ -141,33 +109,7 @@ function escapeHtml(str: string): string {
 }
 
 function buildHtml(data: BundleData): string {
-	const { metadata, requirementsStatus, designStatus, tasksStatus, tasks } = data;
-
-	const doneCount = tasks.filter((t) => t.status === 'done').length;
-	const totalCount = tasks.length;
-	const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-
-	const tasksByStatus = {
-		in_progress: tasks.filter((t) => t.status === 'in_progress'),
-		todo: tasks.filter((t) => t.status === 'todo'),
-		blocked: tasks.filter((t) => t.status === 'blocked'),
-		done: tasks.filter((t) => t.status === 'done'),
-	};
-
-	const orderedTasks = [
-		...tasksByStatus.in_progress,
-		...tasksByStatus.blocked,
-		...tasksByStatus.todo,
-		...tasksByStatus.done,
-	];
-
-	const updatedAt = metadata.timestamps?.updated
-		? new Date(metadata.timestamps.updated).toLocaleDateString(undefined, {
-				year: 'numeric',
-				month: 'short',
-				day: 'numeric',
-			})
-		: null;
+	const { metadata, requirementsStatus, designStatus, tasksStatus } = data;
 
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -202,27 +144,36 @@ function buildHtml(data: BundleData): string {
     color: #fff;
     text-transform: capitalize;
     white-space: nowrap;
+    min-width: 120px;
+    text-align: center;
   }
   .steps {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-direction: row;
+    align-items: flex-start;
     margin-bottom: 28px;
   }
   .step {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--vscode-editorWidget-background, rgba(128,128,128,0.1));
-    border: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,0.2));
-    border-radius: 8px;
+    text-align: center;
+    gap: 8px;
+    min-width: 96px;
+    padding: 0 8px;
+  }
+  .step-connector {
+    flex: 1;
+    height: 2px;
+    background: var(--vscode-editorWidget-border, rgba(128,128,128,0.35));
+    margin-top: 13px;
+    min-width: 24px;
   }
   .step-number {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    background: var(--vscode-editorWidget-border, rgba(128,128,128,0.3));
+    color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -231,56 +182,10 @@ function buildHtml(data: BundleData): string {
     flex-shrink: 0;
   }
   .step-label {
-    flex: 1;
     font-weight: 500;
-  }
-  .section { margin-bottom: 28px; }
-  .progress-wrap { margin-bottom: 16px; }
-  .progress-info { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.85em; opacity: 0.7; }
-  .progress-bar-bg {
-    height: 8px;
-    border-radius: 4px;
-    background: var(--vscode-editorWidget-border, rgba(128,128,128,0.25));
-    overflow: hidden;
-  }
-  .progress-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: #22c55e;
-    transition: width 0.3s ease;
-  }
-  .task-list { display: flex; flex-direction: column; gap: 6px; }
-  .task-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    background: var(--vscode-editorWidget-background, rgba(128,128,128,0.08));
-    border: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,0.15));
-    flex-wrap: wrap;
-  }
-  .task-id {
-    font-family: var(--vscode-editor-font-family, monospace);
-    font-size: 0.78em;
-    opacity: 0.55;
-    white-space: nowrap;
-    min-width: 60px;
-  }
-  .task-title { flex: 1; min-width: 100px; }
-  .effort {
-    font-size: 0.75em;
-    padding: 1px 7px;
-    border-radius: 10px;
-    border: 1px solid currentColor;
-    opacity: 0.55;
-    white-space: nowrap;
+    font-size: 0.9em;
   }
   .empty { opacity: 0.45; font-style: italic; }
-  .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
-  .stat { display: flex; align-items: center; gap: 5px; font-size: 0.85em; }
-  .stat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .divider { border: none; border-top: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,0.2)); margin: 24px 0; }
 </style>
 </head>
 <body>
@@ -296,50 +201,22 @@ function buildHtml(data: BundleData): string {
 
 <div class="steps">
   <div class="step">
-    <div class="step-number">1</div>
+    <div class="step-number" style="background:${statusColor(requirementsStatus)}">1</div>
     <div class="step-label">Requirements</div>
     ${requirementsStatus ? badge(requirementsStatus) : '<span class="empty">not found</span>'}
   </div>
+  <div class="step-connector"></div>
   <div class="step">
-    <div class="step-number">2</div>
+    <div class="step-number" style="background:${statusColor(designStatus)}">2</div>
     <div class="step-label">Design</div>
     ${designStatus ? badge(designStatus) : '<span class="empty">not found</span>'}
   </div>
+  <div class="step-connector"></div>
   <div class="step">
-    <div class="step-number">3</div>
+    <div class="step-number" style="background:${statusColor(tasksStatus)}">3</div>
     <div class="step-label">Tasks</div>
     ${tasksStatus ? badge(tasksStatus) : '<span class="empty">not found</span>'}
   </div>
-</div>
-
-<hr class="divider">
-
-<div class="section">
-  <h2>Tasks (${doneCount} / ${totalCount} done)</h2>
-
-  ${
-		totalCount > 0
-			? `
-  <div class="progress-wrap">
-    <div class="progress-info">
-      <span>${progressPct}% complete</span>
-      <span>${doneCount} done</span>
-    </div>
-    <div class="progress-bar-bg">
-      <div class="progress-bar-fill" style="width:${progressPct}%"></div>
-    </div>
-  </div>
-  <div class="stat-row">
-    <div class="stat"><div class="stat-dot" style="background:#3b82f6"></div>${tasksByStatus.in_progress.length} in progress</div>
-    <div class="stat"><div class="stat-dot" style="background:#ef4444"></div>${tasksByStatus.blocked.length} blocked</div>
-    <div class="stat"><div class="stat-dot" style="background:#6b7280"></div>${tasksByStatus.todo.length} todo</div>
-    <div class="stat"><div class="stat-dot" style="background:#22c55e"></div>${tasksByStatus.done.length} done</div>
-  </div>
-  <div class="task-list">
-    ${orderedTasks.map(taskRow).join('')}
-  </div>`
-			: '<p class="empty">No tasks defined yet.</p>'
-	}
 </div>
 
 </body>
