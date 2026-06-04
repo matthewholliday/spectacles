@@ -10,6 +10,7 @@ import {
 
 const SCRIPT_TEMPLATES = ['code-to-spec.sh', 'spec-to-code.sh'] as const;
 const PROMPT_TEMPLATES = ['code-to-spec.md', 'spec-to-code.md'] as const;
+const AGENT_TEMPLATES = ['spectacles.draft-design.md'] as const;
 
 export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 	const root = getWorkspaceRootUri();
@@ -48,6 +49,21 @@ export async function runInit(context: vscode.ExtensionContext): Promise<void> {
 		);
 		const content = await fs.readFile(templatePath);
 		const destUri = resolveLayoutUri(root, `.spectacles/prompts/${promptName}`);
+		await vscode.workspace.fs.writeFile(destUri, content);
+	}
+
+	const cursorAgentsDir = resolveLayoutUri(root, '.cursor/agents');
+	await vscode.workspace.fs.createDirectory(cursorAgentsDir);
+
+	for (const agentName of AGENT_TEMPLATES) {
+		const templatePath = path.join(
+			context.extensionPath,
+			'resources',
+			'agents',
+			agentName
+		);
+		const content = await fs.readFile(templatePath);
+		const destUri = resolveLayoutUri(root, `.cursor/agents/${agentName}`);
 		await vscode.workspace.fs.writeFile(destUri, content);
 	}
 
