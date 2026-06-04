@@ -44,6 +44,18 @@
         "category": "Spectacles"
       }
     ],
+    "customEditors": [
+      {
+        "viewType": "spectacles.requirementsEditor",
+        "displayName": "Requirements Editor",
+        "selector": [
+          {
+            "filenamePattern": "**/requirements.md"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
     "menus": {
       "explorer/context": [
         {

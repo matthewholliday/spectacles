@@ -4,9 +4,11 @@ import { runNewSpec } from './spectacles/newSpec';
 import { runAgentPrompt } from './spectacles/runPrompt';
 import { runValidate } from './spectacles/validate';
 import { runViewBundleStatus } from './spectacles/viewBundle';
+import { RequirementsEditorProvider } from './spectacles/requirementsEditor';
 
 export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
+		RequirementsEditorProvider.register(context),
 		vscode.commands.registerCommand('spectacles.init', () => runInit(context)),
 		vscode.commands.registerCommand('spectacles.validateProject', () => runValidate()),
 		vscode.commands.registerCommand('spectacles.newSpec', () => runNewSpec()),
