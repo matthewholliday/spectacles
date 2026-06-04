@@ -3,7 +3,7 @@ Here is a formalized specification standard designed for iterative, multi-file a
 ├── requirements.md
 ├── design.md
 └── tasks.json
-State & Completeness PrinciplesGraceful Incompleteness: Every file is technically optional at initialization, but a placeholder file should exist if referenced by metadata.json.State Values: All files track their own lifecycle state via a uniform enum: ["draft", "in_progress", "review", "approved", "deprecated"].The Entry-Point Agnostic Rule: No file relies on another file being "complete" to be parsed validly. An AI agent or parser must handle empty strings, empty arrays, or null values gracefully.2. Component SpecificationsFile 1: metadata.jsonThis file serves as the root index and configuration for the specification directory. It defines the global state and basic identity.JSON{
+State & Completeness PrinciplesGraceful Incompleteness: Every file is technically optional at initialization, but a placeholder file should exist if referenced by metadata.json.State Values: The bundle lifecycle is tracked via the metadata status enum: ["not_started", "requirements_complete", "design_complete", "ready_for_dev", "complete"]. Individual files do not carry their own status.The Entry-Point Agnostic Rule: No file relies on another file being "complete" to be parsed validly. An AI agent or parser must handle empty strings, empty arrays, or null values gracefully.2. Component SpecificationsFile 1: metadata.jsonThis file serves as the root index and configuration for the specification directory. It defines the global state and basic identity.JSON{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "USB_Metadata",
   "type": "object",
@@ -12,7 +12,7 @@ State & Completeness PrinciplesGraceful Incompleteness: Every file is technicall
     "name": { "type": "string", "description": "Human-readable name of the specification" },
     "id": { "type": "string", "description": "A unique slug or UUID for the spec" },
     "description": { "type": "string" },
-    "status": { "enum": ["draft", "in_progress", "review", "approved", "deprecated"] },
+    "status": { "enum": ["not_started", "requirements_complete", "design_complete", "ready_for_dev", "complete"] },
     "version": { "type": "string", "description": "The semantic version of the feature/system being specified" },
     "authors": { "type": "array", "items": { "type": "string" } },
     "timestamps": {
@@ -28,7 +28,6 @@ State & Completeness PrinciplesGraceful Incompleteness: Every file is technicall
 }
 File 2: requirements.mdFocuses entirely on the "What" and "Why" from a product, user, or business perspective. It utilizes standard YAML front-matter.Front-Matter SchemaYAML---
 id: req-spec
-status: draft # [draft, in_progress, review, approved, deprecated]
 last_reviewed_by: []
 target_audience: ["Product", "Engineering"]
 ---
@@ -53,7 +52,6 @@ A brief, high-level overview of what is being built and why it matters.
 * Items explicitly excluded from this iteration.
 File 3: design.mdFocuses entirely on the "How" from a technical architectural perspective.Front-Matter SchemaYAML---
 id: design-spec
-status: draft # [draft, in_progress, review, approved, deprecated]
 architecture_style: "" # e.g., Event-driven, Micro-frontend, MVC
 dependencies: [] # System-level dependencies
 ---
@@ -82,7 +80,6 @@ An actionable, machine-readable backlog optimized for LLMs or automated software
   "title": "USB_Tasks",
   "type": "object",
   "properties": {
-    "status": { "enum": ["draft", "in_progress", "review", "approved", "deprecated"] },
     "tasks": {
       "type": "array",
       "items": {
@@ -108,6 +105,6 @@ An actionable, machine-readable backlog optimized for LLMs or automated software
       }
     }
   },
-  "required": ["status", "tasks"]
+  "required": ["tasks"]
 }
 3. Workflow & Verification MatrixBecause developers can start anywhere, use this quick matrix to guide the development state:Starting StrategyInitial ActionNext Logical StepComplete State GoalProduct-FirstWrite requirements.mdHand off to Architect to build out design.md.tasks.json automatically derived from design elements.Architecture-FirstMap systems in design.mdExtract business objectives into requirements.md.Derive execution path into tasks.json.AI-First (Prototyping)Generate detailed tasks.jsonAgent fills out design.md based on implementation details.Reverse-engineer requirements.md for historical clarity.

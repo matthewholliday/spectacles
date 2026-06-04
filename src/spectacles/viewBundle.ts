@@ -12,21 +12,9 @@ interface BundleMetadata {
 
 interface BundleData {
 	metadata: BundleMetadata;
-	requirementsStatus: string | null;
-	designStatus: string | null;
-	tasksStatus: string | null;
 }
 
 const openPanels = new Map<string, vscode.WebviewPanel>();
-
-function extractFrontMatterStatus(content: string): string | null {
-	const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
-	if (!match) {
-		return null;
-	}
-	const statusMatch = match[1].match(/^status:\s*["']?([a-z_]+)["']?/m);
-	return statusMatch ? statusMatch[1] : null;
-}
 
 async function readFileText(uri: vscode.Uri): Promise<string | null> {
 	try {
@@ -55,36 +43,30 @@ async function readBundleData(dirUri: vscode.Uri): Promise<BundleData | null> {
 		return null;
 	}
 
-	const requirementsText = await readFileText(vscode.Uri.joinPath(dirUri, 'requirements.md'));
-	const designText = await readFileText(vscode.Uri.joinPath(dirUri, 'design.md'));
-	const tasksText = await readFileText(vscode.Uri.joinPath(dirUri, 'tasks.json'));
-
-	const requirementsStatus = requirementsText ? extractFrontMatterStatus(requirementsText) : null;
-	const designStatus = designText ? extractFrontMatterStatus(designText) : null;
-
-	let tasksStatus: string | null = null;
-	if (tasksText) {
-		try {
-			const parsed = JSON.parse(tasksText);
-			tasksStatus = parsed.status ?? null;
-		} catch {
-			// leave defaults
-		}
-	}
-
-	return { metadata, requirementsStatus, designStatus, tasksStatus };
+	return { metadata };
 }
 
 function statusColor(status: string | null): string {
 	switch (status) {
-		case 'done':
+		case 'complete':
 			return '#22c55e';
-		case 'ready-for-review':
+		case 'ready_for_dev':
+			return '#3b82f6';
+		case 'design_complete':
+			return '#8b5cf6';
+		case 'requirements_complete':
 			return '#f59e0b';
-		case 'draft':
+		case 'not_started':
 		default:
 			return '#6b7280';
 	}
+}
+
+const STATUS_ORDER = ['not_started', 'requirements_complete', 'design_complete', 'ready_for_dev', 'complete'] as const;
+
+function stepsCompleted(status: string): [boolean, boolean, boolean, boolean] {
+	const idx = STATUS_ORDER.indexOf(status as typeof STATUS_ORDER[number]);
+	return [idx >= 1, idx >= 2, idx >= 3, idx >= 4];
 }
 
 function statusLabel(status: string | null): string {
@@ -108,8 +90,15 @@ function escapeHtml(str: string): string {
 		.replace(/"/g, '&quot;');
 }
 
+function stepCircle(checked: boolean): string {
+	return checked
+		? `<div class="step-circle checked">✓</div>`
+		: `<div class="step-circle unchecked"></div>`;
+}
+
 function buildHtml(data: BundleData): string {
-	const { metadata, requirementsStatus, designStatus, tasksStatus } = data;
+	const { metadata } = data;
+	const [reqDone, designDone, tasksDone, allDone] = stepsCompleted(metadata.status);
 
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -147,6 +136,7 @@ function buildHtml(data: BundleData): string {
     min-width: 120px;
     text-align: center;
   }
+  .empty { opacity: 0.45; font-style: italic; }
   .steps {
     display: flex;
     flex-direction: row;
@@ -169,23 +159,32 @@ function buildHtml(data: BundleData): string {
     margin-top: 13px;
     min-width: 24px;
   }
-  .step-number {
+  .step-circle {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.78em;
+    font-size: 0.85em;
     font-weight: 700;
     flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .step-circle.checked {
+    background: #22c55e;
+    color: #fff;
+  }
+  .step-circle.unchecked {
+    background: transparent;
+    border: 2px solid var(--vscode-editorWidget-border, rgba(128,128,128,0.45));
+    color: var(--vscode-foreground);
+    opacity: 0.4;
   }
   .step-label {
     font-weight: 500;
     font-size: 0.9em;
   }
-  .empty { opacity: 0.45; font-style: italic; }
 </style>
 </head>
 <body>
@@ -201,21 +200,23 @@ function buildHtml(data: BundleData): string {
 
 <div class="steps">
   <div class="step">
-    <div class="step-number" style="background:${statusColor(requirementsStatus)}">1</div>
+    ${stepCircle(reqDone)}
     <div class="step-label">Requirements</div>
-    ${requirementsStatus ? badge(requirementsStatus) : '<span class="empty">not found</span>'}
   </div>
   <div class="step-connector"></div>
   <div class="step">
-    <div class="step-number" style="background:${statusColor(designStatus)}">2</div>
+    ${stepCircle(designDone)}
     <div class="step-label">Design</div>
-    ${designStatus ? badge(designStatus) : '<span class="empty">not found</span>'}
   </div>
   <div class="step-connector"></div>
   <div class="step">
-    <div class="step-number" style="background:${statusColor(tasksStatus)}">3</div>
+    ${stepCircle(tasksDone)}
     <div class="step-label">Tasks</div>
-    ${tasksStatus ? badge(tasksStatus) : '<span class="empty">not found</span>'}
+  </div>
+  <div class="step-connector"></div>
+  <div class="step">
+    ${stepCircle(allDone)}
+    <div class="step-label">Done</div>
   </div>
 </div>
 
