@@ -1,4 +1,7 @@
+import { spawn } from 'child_process';
 import * as vscode from 'vscode';
+import { getWorkspaceRootUri, resolveLayoutUri, pathExists } from './layout';
+import { getOutputChannel } from './runPrompt';
 
 interface BundleMetadata {
 	spec_version: string;
@@ -161,6 +164,24 @@ function buildHtml(data: BundleData): string {
     font-weight: 500;
     font-size: 0.9em;
   }
+  .actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+  }
+  .draft-btn {
+    padding: 7px 18px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-button-border, transparent);
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    font-size: 0.9em;
+    font-family: var(--vscode-font-family, system-ui, sans-serif);
+    cursor: pointer;
+  }
+  .draft-btn:hover {
+    background: var(--vscode-button-hoverBackground);
+  }
 </style>
 </head>
 <body>
@@ -196,12 +217,76 @@ function buildHtml(data: BundleData): string {
   </div>
 </div>
 
+<div class="actions">
+  <button class="draft-btn" onclick="draftDesign()">Draft design from requirements</button>
+</div>
+
 <script>
   const vscode = acquireVsCodeApi();
   function refresh() { vscode.postMessage({ command: 'refresh' }); }
+  function draftDesign() { vscode.postMessage({ command: 'draftDesign' }); }
 </script>
 </body>
 </html>`;
+}
+
+function stripFrontMatter(content: string): string {
+	if (!content.startsWith('---')) { return content; }
+	const end = content.indexOf('\n---', 3);
+	if (end === -1) { return content; }
+	return content.slice(end + 4).trimStart();
+}
+
+async function runDraftDesign(bundleUri: vscode.Uri): Promise<void> {
+	const root = getWorkspaceRootUri();
+	if (!root) {
+		vscode.window.showErrorMessage('Open a folder/workspace first.');
+		return;
+	}
+
+	const agentUri = resolveLayoutUri(root, '.cursor/agents/spectacles.draft-design.md');
+	if (!(await pathExists(agentUri))) {
+		vscode.window.showErrorMessage(
+			'spectacles.draft-design agent not found. Run Spectacles: Init first.'
+		);
+		return;
+	}
+
+	const bytes = await vscode.workspace.fs.readFile(agentUri);
+	const agentContent = stripFrontMatter(Buffer.from(bytes).toString('utf8'));
+	const fullPrompt = `${agentContent}\n\n${bundleUri.fsPath}\n`;
+
+	const output = getOutputChannel();
+	output.clear();
+	output.appendLine(`[spectacles] draft-design → ${bundleUri.fsPath}`);
+	output.appendLine('');
+	output.show(true);
+
+	const child = spawn('cursor', ['agent', '--print', fullPrompt], {
+		cwd: root.fsPath,
+		shell: false,
+	});
+
+	child.stdout.on('data', (d: Buffer) => output.append(d.toString()));
+	child.stderr.on('data', (d: Buffer) => output.append(d.toString()));
+
+	child.on('close', (code) => {
+		output.appendLine('');
+		if (code !== 0) {
+			output.appendLine(`[spectacles] exited with code ${code}`);
+			vscode.window.showErrorMessage(
+				`draft-design failed (exit ${code}). See Output → Spectacles.`
+			);
+		} else {
+			output.appendLine('[spectacles] done');
+			vscode.window.showInformationMessage('Design drafted. See Output → Spectacles.');
+		}
+	});
+
+	child.on('error', (err: Error) => {
+		output.appendLine(`[spectacles] error: ${err.message}`);
+		vscode.window.showErrorMessage(`draft-design error: ${err.message}`);
+	});
 }
 
 export async function runViewBundleStatus(
@@ -245,6 +330,8 @@ export async function runViewBundleStatus(
 			if (refreshed) {
 				panel.webview.html = buildHtml(refreshed);
 			}
+		} else if (message.command === 'draftDesign') {
+			await runDraftDesign(uri);
 		}
 	}, null, context.subscriptions);
 

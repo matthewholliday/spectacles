@@ -10,7 +10,7 @@ const OUTPUT_CHANNEL_NAME = 'Spectacles';
 
 let outputChannel: vscode.OutputChannel | undefined;
 
-function getOutputChannel(): vscode.OutputChannel {
+export function getOutputChannel(): vscode.OutputChannel {
 	if (!outputChannel) {
 		outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNEL_NAME);
 	}
