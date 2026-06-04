@@ -47,23 +47,13 @@
         "category": "Spectacles"
       },
       {
-        "command": "spectacles.codeToSpec",
-        "title": "spectacles: code-to-spec",
-        "category": "Spectacles"
-      },
-      {
-        "command": "spectacles.specToCode",
-        "title": "spectacles: spec-to-code",
-        "category": "Spectacles"
-      },
-      {
         "command": "spectacles.newSpec",
         "title": "New Spec",
         "category": "Spectacles"
       },
       {
         "command": "spectacles.viewBundleStatus",
-        "title": "View Bundle Status",
+        "title": "spectacles: edit spec",
         "category": "Spectacles"
       }
     ],
@@ -92,17 +82,9 @@
     "menus": {
       "explorer/context": [
         {
-          "command": "spectacles.codeToSpec",
-          "group": "spectacles@1"
-        },
-        {
-          "command": "spectacles.specToCode",
-          "group": "spectacles@2"
-        },
-        {
           "command": "spectacles.viewBundleStatus",
           "when": "explorerResourceIsFolder",
-          "group": "spectacles@3"
+          "group": "spectacles@1"
         }
       ]
     }

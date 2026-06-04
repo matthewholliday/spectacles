@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { runInit } from './spectacles/init';
 import { runNewSpec } from './spectacles/newSpec';
-import { runAgentPrompt } from './spectacles/runPrompt';
 import { runValidate } from './spectacles/validate';
 import { runViewBundleStatus } from './spectacles/viewBundle';
 import { RequirementsEditorProvider } from './spectacles/requirementsEditor';
@@ -14,7 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
 		DesignEditorProvider.register(context),
 		vscode.window.registerWebviewViewProvider(
 			HomePageViewProvider.viewId,
-			new HomePageViewProvider(context.extensionUri)
+			new HomePageViewProvider(context.extensionUri, context)
 		),
 		vscode.commands.registerCommand('spectacles.openHomePage', () =>
 			vscode.commands.executeCommand(`${HomePageViewProvider.viewId}.focus`)
@@ -22,12 +21,6 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('spectacles.init', () => runInit(context)),
 		vscode.commands.registerCommand('spectacles.validateProject', () => runValidate()),
 		vscode.commands.registerCommand('spectacles.newSpec', () => runNewSpec()),
-		vscode.commands.registerCommand('spectacles.codeToSpec', (uri: vscode.Uri) =>
-			runAgentPrompt('code-to-spec', uri)
-		),
-		vscode.commands.registerCommand('spectacles.specToCode', (uri: vscode.Uri) =>
-			runAgentPrompt('spec-to-code', uri)
-		),
 		vscode.commands.registerCommand('spectacles.viewBundleStatus', (uri: vscode.Uri) =>
 			runViewBundleStatus(uri, context)
 		),
