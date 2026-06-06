@@ -220,7 +220,7 @@ export class RequirementsEditorProvider implements vscode.CustomTextEditorProvid
     font-weight: 500;
     opacity: 0.7;
   }
-  input, textarea, select {
+  input, select {
     background: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border, transparent);
@@ -231,25 +231,73 @@ export class RequirementsEditorProvider implements vscode.CustomTextEditorProvid
     outline: none;
     width: 100%;
   }
-  input::placeholder, textarea::placeholder {
+  input::placeholder {
     color: var(--vscode-input-placeholderForeground);
   }
-  input:focus, textarea:focus, select:focus {
+  input:focus, select:focus {
     border-color: var(--vscode-focusBorder, #007fd4);
     outline: 1px solid var(--vscode-focusBorder, #007fd4);
     outline-offset: -1px;
   }
   select option { background: var(--vscode-dropdown-background, #1e1e1e); }
-  textarea {
-    resize: vertical;
-    min-height: 64px;
-    font-family: inherit;
-    line-height: 1.6;
-  }
   .hint {
     font-size: 0.78em;
     opacity: 0.45;
   }
+
+  /* Item list (replaces textareas for array fields) */
+  .item-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .item-list-empty {
+    font-size: 0.82em;
+    opacity: 0.38;
+    font-style: italic;
+    padding: 3px 2px;
+  }
+  .item-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .item-row input {
+    flex: 1;
+    min-width: 0;
+  }
+  .btn-icon {
+    background: transparent;
+    border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.3));
+    color: var(--vscode-foreground);
+    border-radius: 2px;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1em;
+    line-height: 1;
+    flex-shrink: 0;
+    padding: 0;
+    opacity: 0.55;
+  }
+  .btn-icon:hover { opacity: 1; background: rgba(128,128,128,0.15); }
+  .btn-add-item {
+    background: transparent;
+    border: 1px dashed var(--vscode-panel-border, rgba(128,128,128,0.4));
+    color: var(--vscode-foreground);
+    border-radius: 2px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 0.82em;
+    cursor: pointer;
+    text-align: left;
+    opacity: 0.5;
+    width: 100%;
+  }
+  .btn-add-item:hover { opacity: 1; background: rgba(128,128,128,0.08); }
 
   /* Requirements list */
   .reqs-header {
@@ -270,11 +318,6 @@ export class RequirementsEditorProvider implements vscode.CustomTextEditorProvid
     white-space: nowrap;
   }
   .btn:hover { background: var(--vscode-button-hoverBackground); }
-  .btn-secondary {
-    background: var(--vscode-button-secondaryBackground, rgba(128,128,128,0.15));
-    color: var(--vscode-button-secondaryForeground, inherit);
-  }
-  .btn-secondary:hover { background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25)); }
   .btn-danger {
     background: transparent;
     color: var(--vscode-errorForeground, #f44);
@@ -405,6 +448,11 @@ export class RequirementsEditorProvider implements vscode.CustomTextEditorProvid
 
   const PATTERN_TYPES = ['Ubiquitous', 'State-Driven', 'Event-Driven', 'Unwanted-Behavior', 'Optional-Feature', 'Complex'];
 
+  const ITEM_PLACEHOLDER = {
+    responses: 'shall \u2026',
+    preconditions: 'e.g. the user is authenticated',
+  };
+
   function compileFullText(req) {
     const system = (req.system_name || '').trim() || 'The system';
     const responses = (req.responses || []).filter(Boolean).join(' and ');
@@ -433,95 +481,153 @@ export class RequirementsEditorProvider implements vscode.CustomTextEditorProvid
   }
 
   function patternOptions(selected) {
-    return PATTERN_TYPES.map(p =>
-      '<option value="' + p + '"' + (p === selected ? ' selected' : '') + '>' + p + '</option>'
-    ).join('');
+    return PATTERN_TYPES.map(function(p) {
+      return '<option value="' + p + '"' + (p === selected ? ' selected' : '') + '>' + p + '</option>';
+    }).join('');
+  }
+
+  // Builds an inline list of individually-editable items for array fields.
+  function buildItemList(items, reqIndex, field) {
+    const arr = items || [];
+    const placeholder = ITEM_PLACEHOLDER[field] || '';
+    let html = '<div class="item-list" data-req-index="' + reqIndex + '" data-field="' + field + '">';
+    if (arr.length === 0) {
+      html += '<span class="item-list-empty">None yet</span>';
+    }
+    for (let i = 0; i < arr.length; i++) {
+      html +=
+        '<div class="item-row">' +
+          '<input type="text" class="item-input"' +
+            ' data-req-index="' + reqIndex + '"' +
+            ' data-field="' + field + '"' +
+            ' data-item-idx="' + i + '"' +
+            ' value="' + escapeHtml(arr[i]) + '"' +
+            ' placeholder="' + escapeHtml(placeholder) + '" />' +
+          '<button class="btn-icon btn-delete-item"' +
+            ' data-req-index="' + reqIndex + '"' +
+            ' data-field="' + field + '"' +
+            ' data-item-idx="' + i + '"' +
+            ' title="Remove">\u00D7</button>' +
+        '</div>';
+    }
+    html +=
+      '<button class="btn-add-item"' +
+        ' data-req-index="' + reqIndex + '"' +
+        ' data-field="' + field + '">+ Add</button>' +
+      '</div>';
+    return html;
   }
 
   function conditionalFields(req, index) {
     const pt = req.pattern_type;
     let html = '';
     if (pt === 'State-Driven' || pt === 'Complex') {
-      html += '<div class="field full-width">' +
-        '<label>Preconditions (While&hellip;)</label>' +
-        '<textarea rows="2" data-index="' + index + '" data-field="preconditions" placeholder="One precondition per line">' +
-        escapeHtml((req.preconditions || []).join('\\n')) + '</textarea>' +
-        '<span class="hint">One condition per line</span></div>';
+      html +=
+        '<div class="field full-width">' +
+          '<label>Preconditions (While\u2026)</label>' +
+          buildItemList(req.preconditions || [], index, 'preconditions') +
+        '</div>';
     }
     if (pt === 'Event-Driven' || pt === 'Complex') {
-      html += '<div class="field full-width">' +
-        '<label>Trigger (When&hellip;)</label>' +
-        '<input type="text" data-index="' + index + '" data-field="trigger" placeholder="the user submits the form" value="' +
-        escapeHtml(req.trigger || '') + '" /></div>';
+      html +=
+        '<div class="field full-width">' +
+          '<label>Trigger (When\u2026)</label>' +
+          '<input type="text" data-index="' + index + '" data-field="trigger"' +
+            ' placeholder="the user submits the form"' +
+            ' value="' + escapeHtml(req.trigger || '') + '" />' +
+        '</div>';
     }
     if (pt === 'Unwanted-Behavior' || pt === 'Complex') {
-      html += '<div class="field full-width">' +
-        '<label>Unwanted Condition (If&hellip;)</label>' +
-        '<input type="text" data-index="' + index + '" data-field="unwanted_condition" placeholder="an invalid token is provided" value="' +
-        escapeHtml(req.unwanted_condition || '') + '" /></div>';
+      html +=
+        '<div class="field full-width">' +
+          '<label>Unwanted Condition (If\u2026)</label>' +
+          '<input type="text" data-index="' + index + '" data-field="unwanted_condition"' +
+            ' placeholder="an invalid token is provided"' +
+            ' value="' + escapeHtml(req.unwanted_condition || '') + '" />' +
+        '</div>';
     }
     if (pt === 'Optional-Feature' || pt === 'Complex') {
-      html += '<div class="field full-width">' +
-        '<label>Feature Trigger (Where&hellip;)</label>' +
-        '<input type="text" data-index="' + index + '" data-field="feature_trigger" placeholder="dark mode is enabled" value="' +
-        escapeHtml(req.feature_trigger || '') + '" /></div>';
+      html +=
+        '<div class="field full-width">' +
+          '<label>Feature Trigger (Where\u2026)</label>' +
+          '<input type="text" data-index="' + index + '" data-field="feature_trigger"' +
+            ' placeholder="dark mode is enabled"' +
+            ' value="' + escapeHtml(req.feature_trigger || '') + '" />' +
+        '</div>';
     }
     return html;
   }
 
   function buildCardHtml(req, index) {
     const fullText = compileFullText(req);
-    return '<div class="req-card" data-index="' + index + '">' +
-      '<div class="req-card-header" data-toggle="' + index + '">' +
-        '<span class="req-card-id">' + escapeHtml(req.id || 'NEW') + '</span>' +
-        '<span class="req-card-pattern">' + escapeHtml(req.pattern_type || 'Ubiquitous') + '</span>' +
-        '<span class="req-card-preview">' + escapeHtml(fullText) + '</span>' +
-        '<span class="chevron">&#9654;</span>' +
-      '</div>' +
-      '<div class="req-card-body" id="req-body-' + index + '">' +
-        '<div class="req-grid">' +
-          '<div class="field">' +
-            '<label>ID</label>' +
-            '<input type="text" data-index="' + index + '" data-field="id" placeholder="REQ-101" value="' + escapeHtml(req.id || '') + '" spellcheck="false" />' +
+    return (
+      '<div class="req-card" data-index="' + index + '">' +
+        '<div class="req-card-header" data-toggle="' + index + '">' +
+          '<span class="req-card-id">' + escapeHtml(req.id || 'NEW') + '</span>' +
+          '<span class="req-card-pattern">' + escapeHtml(req.pattern_type || 'Ubiquitous') + '</span>' +
+          '<span class="req-card-preview">' + escapeHtml(fullText) + '</span>' +
+          '<span class="chevron">&#9654;</span>' +
+        '</div>' +
+        '<div class="req-card-body" id="req-body-' + index + '">' +
+          '<div class="req-grid">' +
+            '<div class="field">' +
+              '<label>ID</label>' +
+              '<input type="text" data-index="' + index + '" data-field="id"' +
+                ' placeholder="REQ-101" spellcheck="false"' +
+                ' value="' + escapeHtml(req.id || '') + '" />' +
+            '</div>' +
+            '<div class="field">' +
+              '<label>Pattern Type</label>' +
+              '<select data-index="' + index + '" data-field="pattern_type">' +
+                patternOptions(req.pattern_type) +
+              '</select>' +
+            '</div>' +
+            '<div class="field full-width">' +
+              '<label>System Name</label>' +
+              '<input type="text" data-index="' + index + '" data-field="system_name"' +
+                ' placeholder="The authentication service"' +
+                ' value="' + escapeHtml(req.system_name || '') + '" />' +
+            '</div>' +
+            conditionalFields(req, index) +
+            '<div class="field full-width">' +
+              '<label>Responses (shall\u2026)</label>' +
+              buildItemList(req.responses || [], index, 'responses') +
+              '<span class="hint">Include \u201Cshall\u201D in each response</span>' +
+            '</div>' +
+            '<div class="field full-width">' +
+              '<label>Full Text (auto-compiled)</label>' +
+              '<div class="full-text-preview" id="ft-' + index + '">' + escapeHtml(fullText) + '</div>' +
+            '</div>' +
           '</div>' +
-          '<div class="field">' +
-            '<label>Pattern Type</label>' +
-            '<select data-index="' + index + '" data-field="pattern_type">' + patternOptions(req.pattern_type) + '</select>' +
-          '</div>' +
-          '<div class="field full-width">' +
-            '<label>System Name</label>' +
-            '<input type="text" data-index="' + index + '" data-field="system_name" placeholder="The authentication service" value="' + escapeHtml(req.system_name || '') + '" />' +
-          '</div>' +
-          conditionalFields(req, index) +
-          '<div class="field full-width">' +
-            '<label>Responses (shall&hellip;)</label>' +
-            '<textarea rows="3" data-index="' + index + '" data-field="responses" placeholder="shall validate credentials&#10;shall return a token">' +
-            escapeHtml((req.responses || []).join('\\n')) + '</textarea>' +
-            '<span class="hint">One response per line (include &ldquo;shall&rdquo;)</span>' +
-          '</div>' +
-          '<div class="field full-width">' +
-            '<label>Full Text (auto-compiled)</label>' +
-            '<div class="full-text-preview" id="ft-' + index + '">' + escapeHtml(fullText) + '</div>' +
+          '<div class="req-card-footer">' +
+            '<button class="btn btn-danger" data-delete="' + index + '">Delete</button>' +
           '</div>' +
         '</div>' +
-        '<div class="req-card-footer">' +
-          '<button class="btn btn-danger" data-delete="' + index + '">Delete</button>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
+      '</div>'
+    );
+  }
+
+  function updatePreviews(reqIndex) {
+    const ft = compileFullText(state.requirements[reqIndex]);
+    const ftEl = document.getElementById('ft-' + reqIndex);
+    if (ftEl) { ftEl.textContent = ft; }
+    const preview = document.querySelector('.req-card[data-index="' + reqIndex + '"] .req-card-preview');
+    if (preview) { preview.textContent = ft; }
   }
 
   function renderList() {
     const list = document.getElementById('req-list');
     if (state.requirements.length === 0) {
-      list.innerHTML = '<div class="empty-state">No requirements yet. Click &ldquo;+ Add Requirement&rdquo; to get started.</div>';
+      list.innerHTML = '<div class="empty-state">No requirements yet. Click \u201C+ Add Requirement\u201D to get started.</div>';
       return;
     }
     const openCards = new Set(
-      [...document.querySelectorAll('.req-card-body.open')].map(el => Number(el.closest('.req-card').dataset.index))
+      Array.from(document.querySelectorAll('.req-card-body.open')).map(function(el) {
+        return Number(el.closest('.req-card').dataset.index);
+      })
     );
-    list.innerHTML = state.requirements.map((req, i) => buildCardHtml(req, i)).join('');
-    openCards.forEach(i => {
+    list.innerHTML = state.requirements.map(function(req, i) { return buildCardHtml(req, i); }).join('');
+    openCards.forEach(function(i) {
       const body = document.getElementById('req-body-' + i);
       if (body) {
         body.classList.add('open');
@@ -529,95 +635,173 @@ export class RequirementsEditorProvider implements vscode.CustomTextEditorProvid
         if (chevron) { chevron.classList.add('open'); }
       }
     });
-    attachListeners();
   }
 
-  function attachListeners() {
-    document.querySelectorAll('[data-toggle]').forEach(header => {
-      header.addEventListener('click', () => {
-        const i = header.dataset.toggle;
-        const body = document.getElementById('req-body-' + i);
-        const chevron = header.querySelector('.chevron');
-        body.classList.toggle('open');
-        chevron.classList.toggle('open');
-      });
-    });
+  // ---------------------------------------------------------------------------
+  // Delegated event handling on #req-list (no per-element re-attachment needed)
+  // ---------------------------------------------------------------------------
 
-    const debounces = {};
-    function debounced(key, fn, delay) {
-      clearTimeout(debounces[key]);
-      debounces[key] = setTimeout(fn, delay);
+  const reqList = document.getElementById('req-list');
+  const debounces = {};
+
+  function debounced(key, fn, delay) {
+    clearTimeout(debounces[key]);
+    debounces[key] = setTimeout(fn, delay);
+  }
+
+  reqList.addEventListener('click', function(e) {
+    // Delete item from array field
+    const deleteItemBtn = e.target.closest('.btn-delete-item');
+    if (deleteItemBtn) {
+      e.stopPropagation();
+      const reqIndex = Number(deleteItemBtn.dataset.reqIndex);
+      const field = deleteItemBtn.dataset.field;
+      const itemIdx = Number(deleteItemBtn.dataset.itemIdx);
+      const arr = (state.requirements[reqIndex][field] || []).slice();
+      arr.splice(itemIdx, 1);
+      state.requirements[reqIndex][field] = arr;
+      const oldList = deleteItemBtn.closest('.item-list');
+      const tmp = document.createElement('div');
+      tmp.innerHTML = buildItemList(arr, reqIndex, field);
+      oldList.replaceWith(tmp.firstChild);
+      updatePreviews(reqIndex);
+      vscode.postMessage({ type: 'editReq', index: reqIndex, field: field, value: arr.join('\\n') });
+      return;
     }
 
-    document.querySelectorAll('[data-index][data-field]').forEach(el => {
-      const index = Number(el.dataset.index);
-      const field = el.dataset.field;
-      const eventType = el.tagName === 'SELECT' ? 'change' : 'input';
-      el.addEventListener(eventType, e => {
-        debounced('req-' + index + '-' + field, () => {
-          vscode.postMessage({ type: 'editReq', index, field, value: e.target.value });
-        }, 300);
-        // update full_text preview immediately
-        if (field === 'pattern_type') {
-          state.requirements[index].pattern_type = e.target.value;
-          // re-render this card to show/hide conditional fields
-          const card = document.querySelector('.req-card[data-index="' + index + '"]');
-          const wasOpen = document.getElementById('req-body-' + index).classList.contains('open');
-          card.outerHTML = buildCardHtml(state.requirements[index], index);
-          // re-attach after re-render
-          attachListeners();
-          if (wasOpen) {
-            const body = document.getElementById('req-body-' + index);
-            body.classList.add('open');
-            document.querySelector('[data-toggle="' + index + '"] .chevron').classList.add('open');
-          }
-        } else {
-          const req = state.requirements[index];
-          if (field === 'responses' || field === 'preconditions') {
-            req[field] = e.target.value.split('\\n').map(s => s.trim()).filter(Boolean);
-          } else {
-            req[field] = e.target.value;
-          }
-          const ft = compileFullText(req);
-          const ftEl = document.getElementById('ft-' + index);
-          if (ftEl) { ftEl.textContent = ft; }
-          const preview = document.querySelector('.req-card[data-index="' + index + '"] .req-card-preview');
-          if (preview) { preview.textContent = ft; }
-        }
-      });
-    });
+    // Add item to array field
+    const addItemBtn = e.target.closest('.btn-add-item');
+    if (addItemBtn) {
+      e.stopPropagation();
+      const reqIndex = Number(addItemBtn.dataset.reqIndex);
+      const field = addItemBtn.dataset.field;
+      if (!state.requirements[reqIndex][field]) { state.requirements[reqIndex][field] = []; }
+      state.requirements[reqIndex][field].push('');
+      const arr = state.requirements[reqIndex][field];
+      const oldList = addItemBtn.closest('.item-list');
+      const tmp = document.createElement('div');
+      tmp.innerHTML = buildItemList(arr, reqIndex, field);
+      oldList.replaceWith(tmp.firstChild);
+      const inputs = document.querySelectorAll(
+        '.item-input[data-req-index="' + reqIndex + '"][data-field="' + field + '"]'
+      );
+      if (inputs.length > 0) { inputs[inputs.length - 1].focus(); }
+      return;
+    }
 
-    document.querySelectorAll('[data-delete]').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const index = Number(btn.dataset.delete);
-        const reqId = state.requirements[index]?.id || 'this requirement';
-        if (confirm('Delete ' + reqId + '?')) {
-          vscode.postMessage({ type: 'deleteReq', index });
-        }
-      });
-    });
-  }
+    // Delete requirement
+    const deleteReqBtn = e.target.closest('[data-delete]');
+    if (deleteReqBtn) {
+      e.stopPropagation();
+      const index = Number(deleteReqBtn.dataset.delete);
+      const reqId = (state.requirements[index] && state.requirements[index].id) || 'this requirement';
+      if (confirm('Delete ' + reqId + '?')) {
+        vscode.postMessage({ type: 'deleteReq', index: index });
+      }
+      return;
+    }
 
+    // Toggle accordion
+    const toggleHeader = e.target.closest('[data-toggle]');
+    if (toggleHeader) {
+      const i = toggleHeader.dataset.toggle;
+      const body = document.getElementById('req-body-' + i);
+      const chevron = toggleHeader.querySelector('.chevron');
+      if (body) { body.classList.toggle('open'); }
+      if (chevron) { chevron.classList.toggle('open'); }
+    }
+  });
+
+  reqList.addEventListener('input', function(e) {
+    // Array field item edit
+    const itemInput = e.target.closest('.item-input');
+    if (itemInput) {
+      const reqIndex = Number(itemInput.dataset.reqIndex);
+      const field = itemInput.dataset.field;
+      const allInputs = Array.from(document.querySelectorAll(
+        '.item-input[data-req-index="' + reqIndex + '"][data-field="' + field + '"]'
+      ));
+      const values = allInputs.map(function(el) { return el.value; });
+      state.requirements[reqIndex][field] = values.filter(Boolean);
+      updatePreviews(reqIndex);
+      debounced('item-' + reqIndex + '-' + field, function() {
+        vscode.postMessage({ type: 'editReq', index: reqIndex, field: field, value: values.filter(Boolean).join('\\n') });
+      }, 300);
+      return;
+    }
+
+    // Scalar field edit
+    const fieldEl = e.target.closest('[data-index][data-field]');
+    if (fieldEl) {
+      const index = Number(fieldEl.dataset.index);
+      const field = fieldEl.dataset.field;
+      const value = e.target.value;
+      state.requirements[index][field] = value;
+      updatePreviews(index);
+      debounced('req-' + index + '-' + field, function() {
+        vscode.postMessage({ type: 'editReq', index: index, field: field, value: value });
+      }, 300);
+    }
+  });
+
+  reqList.addEventListener('change', function(e) {
+    const selectEl = e.target.closest('select[data-index][data-field]');
+    if (!selectEl) { return; }
+    const index = Number(selectEl.dataset.index);
+    const field = selectEl.dataset.field;
+    const value = e.target.value;
+
+    state.requirements[index][field] = value;
+
+    if (field === 'pattern_type') {
+      const card = document.querySelector('.req-card[data-index="' + index + '"]');
+      const wasOpen = document.getElementById('req-body-' + index).classList.contains('open');
+      const tmp = document.createElement('div');
+      tmp.innerHTML = buildCardHtml(state.requirements[index], index);
+      card.replaceWith(tmp.firstChild);
+      if (wasOpen) {
+        const body = document.getElementById('req-body-' + index);
+        if (body) { body.classList.add('open'); }
+        const chevron = document.querySelector('[data-toggle="' + index + '"] .chevron');
+        if (chevron) { chevron.classList.add('open'); }
+      }
+    }
+
+    updatePreviews(index);
+    debounced('req-' + index + '-' + field, function() {
+      vscode.postMessage({ type: 'editReq', index: index, field: field, value: value });
+    }, 300);
+  });
+
+  // ---------------------------------------------------------------------------
   // Metadata field listeners
+  // ---------------------------------------------------------------------------
+
   const metaDebounces = {};
   function metaDebounced(key, fn) {
     clearTimeout(metaDebounces[key]);
     metaDebounces[key] = setTimeout(fn, 300);
   }
+
   const idInput = document.getElementById('id-input');
   const lastReviewedByInput = document.getElementById('last-reviewed-by-input');
   const targetAudienceInput = document.getElementById('target-audience-input');
 
-  idInput.addEventListener('input', e => metaDebounced('id', () => vscode.postMessage({ type: 'edit', key: 'id', value: e.target.value })));
-  lastReviewedByInput.addEventListener('input', e => metaDebounced('lr', () => vscode.postMessage({ type: 'edit', key: 'lastReviewedBy', value: e.target.value })));
-  targetAudienceInput.addEventListener('input', e => metaDebounced('ta', () => vscode.postMessage({ type: 'edit', key: 'targetAudience', value: e.target.value })));
+  idInput.addEventListener('input', function(e) {
+    metaDebounced('id', function() { vscode.postMessage({ type: 'edit', key: 'id', value: e.target.value }); });
+  });
+  lastReviewedByInput.addEventListener('input', function(e) {
+    metaDebounced('lr', function() { vscode.postMessage({ type: 'edit', key: 'lastReviewedBy', value: e.target.value }); });
+  });
+  targetAudienceInput.addEventListener('input', function(e) {
+    metaDebounced('ta', function() { vscode.postMessage({ type: 'edit', key: 'targetAudience', value: e.target.value }); });
+  });
 
-  document.getElementById('add-req-btn').addEventListener('click', () => {
+  document.getElementById('add-req-btn').addEventListener('click', function() {
     vscode.postMessage({ type: 'addReq' });
   });
 
-  window.addEventListener('message', event => {
+  window.addEventListener('message', function(event) {
     const msg = event.data;
     if (msg.type !== 'update') { return; }
     state = msg.data;
