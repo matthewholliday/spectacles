@@ -10,7 +10,7 @@ import {
 
 const SCRIPT_TEMPLATES = ['code-to-spec.sh', 'spec-to-code.sh'] as const;
 const PROMPT_TEMPLATES = ['code-to-spec.md', 'spec-to-code.md'] as const;
-const AGENT_TEMPLATES = ['spectacles.draft-design.md', 'spectacles.generate-tasks.md'] as const;
+const AGENT_TEMPLATES = ['spectacles.draft.md', 'spectacles.draft-design.md', 'spectacles.generate-tasks.md'] as const;
 
 const SPECTACLES_HOOK_EVENTS = [
 	'sessionStart',

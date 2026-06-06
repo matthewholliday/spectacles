@@ -1,4 +1,15 @@
 import * as vscode from 'vscode';
+import {
+	agentActionCss,
+	agentActionHtml,
+	agentActionJs,
+	runAgentAction,
+	resolveLayoutUri,
+	getWorkspaceRootUri,
+	type PostFn,
+} from './agentActionComponent';
+
+const DRAFT_TARGET = 'dft';
 
 let panel: vscode.WebviewPanel | undefined;
 
@@ -16,6 +27,47 @@ export function openNewSpecWebview(context: vscode.ExtensionContext): void {
 	);
 
 	panel.webview.html = buildHtml();
+
+	const postToPanel: PostFn = (command, payload) =>
+		panel?.webview.postMessage({ command, ...payload });
+
+	panel.webview.onDidReceiveMessage(async (message) => {
+		if (message.command === 'draft') {
+			const root = getWorkspaceRootUri();
+			if (!root) {
+				vscode.window.showErrorMessage('Open a folder/workspace first.');
+				return;
+			}
+
+			const { name, description, version, targetAudience, authors } = message;
+
+			const promptSuffix = JSON.stringify(
+				{
+					workspaceRoot: root.fsPath,
+					name,
+					description: description ?? '',
+					version: version || '0.1.0',
+					targetAudience: typeof targetAudience === 'string'
+						? targetAudience.split(',').map((s: string) => s.trim()).filter(Boolean)
+						: (targetAudience ?? []),
+					authors: typeof authors === 'string'
+						? authors.split(',').map((s: string) => s.trim()).filter(Boolean)
+						: (authors ?? []),
+				},
+				null,
+				2
+			);
+
+			const agentUri = resolveLayoutUri(root, '.cursor/agents/spectacles.draft.md');
+			await runAgentAction({
+				agentUri,
+				promptSuffix,
+				post: postToPanel,
+				root,
+				target: DRAFT_TARGET,
+			});
+		}
+	}, null, context.subscriptions);
 
 	panel.onDidDispose(() => {
 		panel = undefined;
@@ -108,6 +160,13 @@ function buildHtml(): string {
       color: var(--vscode-descriptionForeground);
     }
 
+    .field-error {
+      margin-top: 4px;
+      font-size: 0.8em;
+      color: var(--vscode-inputValidation-errorBorder, #f44747);
+      display: none;
+    }
+
     .divider {
       border: none;
       border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
@@ -152,74 +211,119 @@ function buildHtml(): string {
       border-color: var(--vscode-button-border, transparent);
     }
 
-    .btn-primary:hover {
+    .btn-primary:hover:not(:disabled) {
       background: var(--vscode-button-hoverBackground);
     }
 
-    .btn-secondary {
-      background: var(--vscode-button-secondaryBackground, rgba(128,128,128,0.15));
-      color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
-    .btn-secondary:hover {
-      background: var(--vscode-button-secondaryHoverBackground, rgba(128,128,128,0.25));
+    /* Hide the auto-generated agent action trigger button —
+       the form submit button serves as the trigger instead. */
+    #${DRAFT_TARGET}-trigger {
+      display: none;
     }
 
-    .coming-soon {
-      font-size: 0.8em;
-      color: var(--vscode-descriptionForeground);
-      font-style: italic;
-    }
+    ${agentActionCss()}
   </style>
 </head>
 <body>
+  <script>
+    window.__vscodeApi = acquireVsCodeApi();
+  </script>
+
   <h1>New Specification</h1>
   <p class="subtitle">Define the details for your new spec bundle. Fields marked <span style="color:var(--vscode-inputValidation-errorBorder,#f44747)">*</span> are required.</p>
 
-  <div class="form-group">
-    <label for="name">Name <span class="required">*</span></label>
-    <input type="text" id="name" placeholder="e.g. User Authentication" autocomplete="off" />
-    <p class="field-description">Human-readable name for the specification. Used to generate the spec ID.</p>
-  </div>
-
-  <div class="form-group">
-    <label for="description">Description <span class="hint">(optional)</span></label>
-    <textarea id="description" placeholder="A short summary of what this spec covers..."></textarea>
-  </div>
-
-  <hr class="divider" />
-  <p class="section-label">Metadata</p>
-
-  <div class="two-col">
+  <div id="spec-form">
     <div class="form-group">
-      <label for="version">Version</label>
-      <input type="text" id="version" value="0.1.0" autocomplete="off" />
-      <p class="field-description">Semantic version for this spec (e.g. 0.1.0).</p>
+      <label for="name">Name <span class="required">*</span></label>
+      <input type="text" id="name" placeholder="e.g. User Authentication" autocomplete="off" />
+      <p class="field-error" id="name-error">Spec name is required.</p>
+      <p class="field-description">Human-readable name for the specification. Used to generate the spec ID.</p>
     </div>
 
     <div class="form-group">
-      <label for="target-audience">Target Audience <span class="hint">(optional)</span></label>
-      <input type="text" id="target-audience" placeholder="Product, Engineering" autocomplete="off" />
-      <p class="field-description">Comma-separated list of intended readers.</p>
+      <label for="description">Description <span class="hint">(optional)</span></label>
+      <textarea id="description" placeholder="A short summary of what this spec covers..."></textarea>
+    </div>
+
+    <hr class="divider" />
+    <p class="section-label">Metadata</p>
+
+    <div class="two-col">
+      <div class="form-group">
+        <label for="version">Version</label>
+        <input type="text" id="version" value="0.1.0" autocomplete="off" />
+        <p class="field-description">Semantic version for this spec (e.g. 0.1.0).</p>
+      </div>
+
+      <div class="form-group">
+        <label for="target-audience">Target Audience <span class="hint">(optional)</span></label>
+        <input type="text" id="target-audience" placeholder="Product, Engineering" autocomplete="off" />
+        <p class="field-description">Comma-separated list of intended readers.</p>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="authors">Authors <span class="hint">(optional)</span></label>
+      <input type="text" id="authors" placeholder="Alice, Bob" autocomplete="off" />
+      <p class="field-description">Comma-separated list of authors responsible for this spec.</p>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" id="submit">Create Specification</button>
     </div>
   </div>
 
-  <div class="form-group">
-    <label for="authors">Authors <span class="hint">(optional)</span></label>
-    <input type="text" id="authors" placeholder="Alice, Bob" autocomplete="off" />
-    <p class="field-description">Comma-separated list of authors responsible for this spec.</p>
-  </div>
-
-  <div class="actions">
-    <button class="btn-primary" id="submit">Create Specification</button>
-    <span class="coming-soon">Submission not yet implemented.</span>
-  </div>
+  ${agentActionHtml({ buttonLabel: 'Create Specification', command: 'draft', id: DRAFT_TARGET })}
+  ${agentActionJs({ command: 'draft', id: DRAFT_TARGET })}
 
   <script>
     (function() {
-      // TODO: wire up submit to create spec files on disk
-      document.getElementById('submit').addEventListener('click', function() {
-        // no-op for now
+      var submitBtn = document.getElementById('submit');
+      var nameInput = document.getElementById('name');
+      var nameError = document.getElementById('name-error');
+
+      submitBtn.addEventListener('click', function() {
+        var name = nameInput.value.trim();
+
+        if (!name) {
+          nameError.style.display = 'block';
+          nameInput.focus();
+          return;
+        }
+
+        nameError.style.display = 'none';
+        submitBtn.disabled = true;
+
+        // Manually transition the agent action component to running state
+        // (the trigger is hidden; this mirrors what dft_run() would do)
+        var running = document.getElementById('${DRAFT_TARGET}-running');
+        var logSection = document.getElementById('${DRAFT_TARGET}-log-section');
+        if (running) { running.style.display = ''; }
+        if (logSection) { logSection.classList.add('expanded'); }
+
+        window.__vscodeApi.postMessage({
+          command: 'draft',
+          name: name,
+          description: document.getElementById('description').value.trim(),
+          version: document.getElementById('version').value.trim() || '0.1.0',
+          targetAudience: document.getElementById('target-audience').value.trim(),
+          authors: document.getElementById('authors').value.trim(),
+        });
+      });
+
+      // Re-enable the submit button when the agent finishes
+      // (appendLogs with isActive=false is the completion signal)
+      var origAppend = window['${DRAFT_TARGET}_appendLogs'];
+      window.addEventListener('message', function(ev) {
+        var msg = ev.data;
+        if (msg.target === '${DRAFT_TARGET}' && msg.command === 'appendLogs' && !msg.isActive) {
+          submitBtn.disabled = false;
+        }
       });
     })();
   </script>
