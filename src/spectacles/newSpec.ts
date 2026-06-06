@@ -27,30 +27,16 @@ function buildMetadata(name: string, id: string, description: string): string {
 }
 
 function buildRequirements(name: string, id: string): string {
-	return `---
-id: ${id}
-status: draft
-last_reviewed_by: []
-target_audience: ["Product", "Engineering"]
----
-
-# Requirements: ${name}
-
-## 1. Executive Summary
-A brief, high-level overview of what is being built and why it matters.
-
-## 2. User Stories / Use Cases
-* **As a** [user role], **I want to** [action] **so that** [value/outcome].
-
-## 3. Functional Requirements
-* **FR-1:** The system MUST...
-
-## 4. Non-Functional Requirements
-* **NFR-1 (Performance):** ...
-
-## 5. Out of Scope
-* Items explicitly excluded from this iteration.
-`;
+	const starter = [
+		{
+			id: 'REQ-001',
+			pattern_type: 'Ubiquitous',
+			system_name: `The ${name} system`,
+			responses: ['shall [describe the mandatory behavior]'],
+			full_text: `The ${name} system shall [describe the mandatory behavior].`,
+		},
+	];
+	return `---\nid: ${id}\nlast_reviewed_by: []\ntarget_audience: ["Product", "Engineering"]\n---\n${JSON.stringify(starter, null, 2)}\n`;
 }
 
 function buildDesign(name: string, id: string): string {
