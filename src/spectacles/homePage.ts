@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { runViewBundleStatus } from './viewBundle';
+import { openNewSpecWebview } from './newSpecWebview';
 
 interface SpecEntry {
 	name: string;
@@ -29,6 +30,8 @@ export class HomePageViewProvider implements vscode.WebviewViewProvider {
 		webviewView.webview.onDidReceiveMessage(async (message) => {
 			if (message.command === 'refresh' && this._view) {
 				this._view.webview.html = await this.buildHtml(this._view.webview);
+			} else if (message.command === 'newSpec') {
+				openNewSpecWebview(this.context);
 			} else if (message.command === 'openBundleDetails') {
 				const folders = vscode.workspace.workspaceFolders;
 				if (!folders || folders.length === 0) { return; }
@@ -161,6 +164,22 @@ export class HomePageViewProvider implements vscode.WebviewViewProvider {
       letter-spacing: 0.02em;
       color: var(--vscode-foreground);
     }
+
+    .new-spec-btn {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: 1px solid var(--vscode-button-border, transparent);
+      cursor: pointer;
+      padding: 3px 10px;
+      border-radius: 3px;
+      font-size: 0.8em;
+      font-family: var(--vscode-font-family);
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    .new-spec-btn:hover { background: var(--vscode-button-hoverBackground); }
+    .new-spec-btn:active { opacity: 0.8; }
 
     .refresh-btn {
       background: none;
@@ -304,6 +323,7 @@ export class HomePageViewProvider implements vscode.WebviewViewProvider {
   <div class="header">
     <div class="icon">${svgContent}</div>
     <h1 class="title">Spectacles</h1>
+    <button class="new-spec-btn" id="new-spec">+ New Spec</button>
     <button class="refresh-btn" id="refresh" title="Refresh spec list">↺</button>
   </div>
   <hr />
@@ -313,6 +333,9 @@ export class HomePageViewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}">
     (function() {
       const vscode = acquireVsCodeApi();
+      document.getElementById('new-spec').addEventListener('click', function() {
+        vscode.postMessage({ command: 'newSpec' });
+      });
       document.getElementById('refresh').addEventListener('click', function() {
         this.style.opacity = '0.4';
         vscode.postMessage({ command: 'refresh' });
